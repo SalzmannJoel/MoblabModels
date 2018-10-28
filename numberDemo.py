@@ -13,7 +13,7 @@ OPTIMIZER = tf.keras.optimizers.SGD() # SGD optimizer, explained later in this c
 N_HIDDEN = 128
 VALIDATION_SPLIT=0.2 # how much TRAIN is reserved for VALIDATION
 # data: shuffled and split between train and test sets
-(X_train, y_train), (X_test, y_test) = mnist.load_data()
+(X_train, Y_train), (X_test, Y_test) = mnist.load_data()
 #X_train is 60000 rows of 28x28 values --> reshaped in 60000 x 784
 RESHAPED = 784
 X_train = X_train.reshape(60000, RESHAPED)
@@ -26,9 +26,8 @@ X_test /= 255
 print(X_train.shape[0], 'train samples')
 print(X_test.shape[0], 'test samples')
 # convert class vectors to binary class matrices
-Y_train = np_utils.to_categorical(y_train, NB_CLASSES)
-Y_test = np_utils.to_categorical(y_test, NB_CLASSES)
-
+Y_train = np_utils.to_categorical(Y_train, NB_CLASSES)
+Y_test = np_utils.to_categorical(Y_test, NB_CLASSES)
 
 
 def createModel():
@@ -42,9 +41,9 @@ def createModel():
     return model
 
 
-def train(model):
+def train(model, x_train, y_train):
     # train
-    model.fit(X_train, Y_train, batch_size=BATCH_SIZE, epochs=NB_EPOCH, verbose=VERBOSE, validation_split=VALIDATION_SPLIT)
+    model.fit(x_train, y_train, batch_size=BATCH_SIZE, epochs=NB_EPOCH, verbose=VERBOSE, validation_split=VALIDATION_SPLIT)
     return model
 
 
@@ -54,11 +53,33 @@ def evaluate(model):
     print('Test accuracy:', score[1])
 
 
-def predict(model, vector):
+# This method takes a model, loads the weights from the weightsPath-File and predicts the given value
+def predict(model, weightsPath, value):
     # Predict a given Array
-    model.load_weights("keras_model.h5")
-    testvalue = vector
-    probabilities = model.predict(np.expand_dims(testvalue, axis=0))
+    model.load_weights(weightsPath)
+    probabilities = model.predict(np.expand_dims(value, axis=0))
+    printAnswer(probabilities)
+
+
+# This method creates a new model, trains it on X_train as zeros and ones, Y_train and predicts the given value
+def predictMNISTasZeroOrOne(value):
+    model = createModel()
+    newSet = getMNISTasZeroOrOne()
+    trainedModel = train(model, newSet, Y_train)
+    probabilities = trainedModel.predict(np.expand_dims(value, axis=0))
+    printAnswer(probabilities)
+
+
+# This method creates a new model, trains it on X_train, Y_train and predicts the given value
+def predictMNIST(value):
+    model = createModel()
+    trainedModel = train(model, X_train, Y_train)
+    probabilities = trainedModel.predict(np.expand_dims(value, axis=0))
+    printAnswer(probabilities)
+
+
+#  This method creates a new model, trains it on X_train, Y_train and predicts the given value
+def printAnswer(probabilities):
     answer = 0
     answerProbability = 0
     for index, item in enumerate(probabilities[0]):
@@ -67,16 +88,18 @@ def predict(model, vector):
     print("I think it is a " + str(answer))
 
 
-def convert(model):
+def saveModel(model, filePath="keras_model.h5"):
     # Save tf.keras model in HDF5 format.
-    keras_file = "keras_model.h5"
+    keras_file = filePath
     tf.keras.models.save_model(model, keras_file)
 
+
+def convert(saveFileName, kerasFile="keras_model.h5"):
     # Convert to TensorFlow Lite model.
     # converter = tflite.convert_savedmodel.convert(keras_file, "converted_model.tflite")
-    converter = tflite.TFLiteConverter.from_keras_model_file(keras_file)
+    converter = tflite.TFLiteConverter.from_keras_model_file(kerasFile)
     tflite_model = converter.convert()
-    open("converted_model.tflite", "wb").write(tflite_model)
+    open(saveFileName+".tflite", "wb").write(tflite_model)
 
 
 def getMNISTasZeroOrOne():
@@ -89,64 +112,8 @@ def getMNISTasZeroOrOne():
     return newTrainSet
 
 
-# predict loads the model "keras_model.h5" as zeros or ones and predicts testvalue
-def predictMNISTasZeroOrOne(value):
-    model = createModel()
-    newSet = getMNISTasZeroOrOne()
-    model.fit(newSet, Y_train, batch_size=BATCH_SIZE, epochs=NB_EPOCH, verbose=VERBOSE, validation_split=VALIDATION_SPLIT)
-    predict(model, value)
-
-
-# predict loads the model "keras_model.h5" and predicts testvalue
-def predictMNIST(value):
-    model = createModel()
-    # train and convert it or predict
-    trainedModel = train(model)
-    # convert(model)
-    predict(trainedModel, value)
-
-# it is a 3
-testvalue = np.array(
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0,
-     1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-     1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-     1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-     1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-     0.0, 0.0])
-predictMNISTasZeroOrOne(testvalue)
-# normal mnist thinks its a 9
-# zeroOne mnist thinks its a 9
-# custom thinks its a 9
-# tflite thinks its a 3
-# its a 3
-
-
+model = createModel()
+newSet = getMNISTasZeroOrOne()
+trainedModel = train(model, newSet, Y_train)
+saveModel(trainedModel, "modelFromMNISTZeroesAndOnes.h5")
+convert("modelFromMNISTZeroesAndOnes", "modelFromMNISTZeroesAndOnes.h5")
